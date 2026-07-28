@@ -228,7 +228,7 @@ Rscript tests/r_reference_driver.R      $REF 0 16     # 0 = full gene set
 Rscript tests/r_reference_supplement.R  $REF 0
 python  tests/_run_candidate.py         $REF   16
 
-NICHEDE_REF_DIR=$REF pytest -q            # -> 63 passed
+NICHEDE_REF_DIR=$REF pytest -q            # -> 67 passed
 python tests/parity_report.py $REF        # -> the table in §3.1
 ```
 
@@ -282,7 +282,7 @@ perturbation budget.
 | Check | Status |
 |---|---|
 | `pip install .` in a fresh env | ✅ |
-| `pytest -q` green | ✅ **63 / 63** with the R reference; 31 / 31 without it |
+| `pytest -q` green | ✅ **67 / 67** with the R reference; 35 / 35 without it |
 | `examples/compare_R_vs_Python.ipynb` | ✅ pre-executed, outputs committed |
 | `examples/tutorial_liver_met_visium.ipynb` | ✅ pre-executed, outputs committed |
 | `examples/function_by_function_R_parity.ipynb` | ✅ pre-executed, outputs committed |
@@ -301,8 +301,30 @@ perturbation budget.
 
 ## 6. Known limitations
 
-This is **fixture-level equivalence**, not a proof over the full input domain.
-Everything below is measured, not assumed.
+This is **fixture-level equivalence**, not a proof over the full input domain —
+with one deliberate exception, described first.
+
+### 6.0 Off-fixture evidence for the load-bearing primitive
+
+Everything Niche-DE reports flows through R's IRLS + LINPACK `dqrdc2`
+limited-pivot rank detection, because *which* column `dqrdc2` aliases away
+decides which interactions are dropped and therefore which genes are reported.
+To get evidence beyond the single fixture, `r_glm_fit` was differential-tested
+against R's `glm.fit` on **200 randomly generated Poisson-GLM problems**
+(n ∈ [30, 400], p ∈ [2, 12], random offsets, injected collinearity and constant
+columns), of which **97 were rank-deficient** with 107 aliased coefficients:
+
+| property | result |
+|---|---|
+| numerical rank matches R | **200 / 200** |
+| `NA` pattern matches R (the *same* columns aliased, not merely the same count) | **200 / 200** |
+| max relative coefficient deviation | **1.55e-13** |
+
+A 42-case subset (22 rank-deficient) is committed as
+`tests/data_glm_reference.npz` and gated by `tests/test_glm_differential.py`,
+so this property is a permanent regression guard rather than a one-off check.
+`statsmodels.GLM` fails the second row by construction — it uses `pinv` and
+spreads the fit across collinear columns instead of dropping a specific one.
 
 ### 6.1 `CalculateEffectiveNicheLargeScale`: the port is correct, the R reference is not
 
