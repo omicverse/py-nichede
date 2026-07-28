@@ -580,11 +580,21 @@ same_downstream = bool((lr_R.iloc[:, 2].astype(str).to_numpy()
 print(f"ligand-receptor pair Jaccard        : {J_lr:.3f}  ({len(pairs_R)} R / {len(pairs_PY)} Python)")
 print(f"top-downstream-gene strings identical: {same_downstream}")
 
-cell_R_missing = not os.path.exists(os.path.join(REF_DIR, "ref_niche_LR_cell.csv"))
-cand_cell = os.path.join(REF_DIR, "cand_niche_LR_cell.csv")
-cell_PY_empty = (not os.path.exists(cand_cell)) or os.path.getsize(cand_cell) == 0
-print(f"niche_LR_cell -- R produced no table : {cell_R_missing}")
-print(f"niche_LR_cell -- Python produced none: {cell_PY_empty}")
+def _n_rows(path):
+    """Row count of a possibly-empty CSV (an errored run writes a bare newline)."""
+    if not os.path.exists(path):
+        return None                      # R writes no file at all when it raises
+    try:
+        return len(pd.read_csv(path))
+    except pd.errors.EmptyDataError:
+        return 0
+
+n_cell_R  = _n_rows(os.path.join(REF_DIR, "ref_niche_LR_cell.csv"))
+n_cell_PY = _n_rows(os.path.join(REF_DIR, "cand_niche_LR_cell.csv"))
+print(f"niche_LR_cell -- R rows reported     : {n_cell_R}  (None = R raised, wrote no file)")
+print(f"niche_LR_cell -- Python rows reported: {n_cell_PY}")
+print("both sides report nothing            : "
+      f"{(n_cell_R in (None, 0)) and (n_cell_PY in (None, 0))}")
 
 fig, ax = plt.subplots(1, 2, figsize=(9.5, 3.1))
 ax[0].bar(["R", "Python"], [len(pairs_R), len(pairs_PY)], color=[C_R, C_PY])

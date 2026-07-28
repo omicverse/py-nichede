@@ -393,3 +393,4 @@ Not yet vendored. Proposed landing: `omicverse/external/pynichede/` exposed as
 | Upstream commit treated as spec | `87e0e89bb066702a54fa47638965b61dc6f24d05` |
 | Acceleration iterations | 7 accepted / 8 proposed (1 rejected) + 3 equivalence fixes |
 | Parity gate | pre-registered 2026-07-28 before any algorithmic Python; never modified |
+| Pre-registration provenance | `data/manifest.yaml` mtime **04:37:24**, `DISCOVERY.md` **04:38:19**; the earliest algorithmic module (`pynichede/object_creation.py`) **04:50:01**. The gate demonstrably predates the code it grades. |
