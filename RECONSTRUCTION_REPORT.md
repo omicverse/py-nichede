@@ -155,6 +155,11 @@ Canonical fixture: the dataset shipped inside the R package
 | `Int = FALSE` (linear model) `T_stat` | Pearson / Spearman | **1.000000 / 1.000000** |
 | `Int = FALSE` valid flags | agreement | **1.000000** (93 / 93) |
 | `Int = FALSE` gene-level p | Spearman(-log10 p) / top-50 J | 0.988981 / 0.923 |
+| **multi-batch** `T_stat`, σ=1 / 100 / 250 | Pearson / Spearman | **1.000000 / 1.000000** (max rel. dev. 4.1e-7) |
+| **multi-batch** valid flags | agreement | **1.000000** (93 / 95 / 95 valid genes) |
+| **multi-batch** merged coord / num_cells / batch_ID | max abs err | 9.1e-13 / 1.3e-15 / **0** |
+| **multi-batch** effective niche | max abs err | 3.8e-13 |
+| **multi-batch** gene-level p | Spearman(-log10 p) | 0.996739 |
 | helper probes (`T_to_p`, `ultosymmetric`, `gene_level`, `celltype_level`, `nb_lik`) | max abs err | 1.1e-16 / 0 / 0 / 2.2e-16 / 1.8e-15 |
 
 **Residual on the headline statistic:** `T_stat` matches R to a max **relative**
@@ -193,14 +198,27 @@ genes, consistent with the same hypoxic/angiogenic programme.
 
 So the port reproduces both the numbers and the conclusion.
 
-### 3.4 Per-fixture parity
+### 3.4 Multi-batch coverage
+
+The canonical fixture is a single tissue section, so the multi-batch code path
+(`MergeObjects`' coordinate renormalisation, the factor `batchvar` that
+`model.matrix` expands into `nlevels - 1` treatment contrasts, and the extra
+dummy block appended to `X'WX` before the Cholesky) would otherwise never be
+gated. `tests/r_reference_supplement.R` therefore merges the fixture with a
+1.5x-rescaled copy of itself and runs the R `niche_DE` on the resulting
+two-batch object; `tests/test_multibatch_parity.py` gates the Python port
+against it at the same pre-registered thresholds. Result: **Pearson = Spearman
+= 1.000000 on `T_stat` for all three bandwidths, valid-flag agreement exactly
+1.000000**.
+
+### 3.5 Per-fixture parity
 
 | Fixture | `T_stat` Pearson | valid-flag agreement | Wall-clock Py | Wall-clock R | Speedup |
 |---|---|---|---|---|---|
 | dev (848 × 300, 3σ, 7 CT) | 1.000000 | 1.000000 | 0.686 s (8 jobs) | 18.25 s (8 cores) | **26.6×** |
 | **canonical (848 × 21 708, 3σ, 7 CT)** | **1.000000** | **1.000000** | **32.6 s (16 jobs)** | **852.2 s (16 cores)** | **26.1×** |
 
-### 3.5 Reference command (reproducible)
+### 3.6 Reference command (reproducible)
 
 ```bash
 export R_LIBS_USER=/path/to/rlibs         # nicheDE + poolr installed here
@@ -210,7 +228,7 @@ Rscript tests/r_reference_driver.R      $REF 0 16     # 0 = full gene set
 Rscript tests/r_reference_supplement.R  $REF 0
 python  tests/_run_candidate.py         $REF   16
 
-NICHEDE_REF_DIR=$REF pytest -q            # -> 58 passed
+NICHEDE_REF_DIR=$REF pytest -q            # -> 63 passed
 python tests/parity_report.py $REF        # -> the table in §3.1
 ```
 
@@ -264,7 +282,7 @@ perturbation budget.
 | Check | Status |
 |---|---|
 | `pip install .` in a fresh env | ✅ |
-| `pytest -q` green | ✅ **58 / 58** with the R reference; 31 / 31 without it |
+| `pytest -q` green | ✅ **63 / 63** with the R reference; 31 / 31 without it |
 | `examples/compare_R_vs_Python.ipynb` | ✅ pre-executed, outputs committed |
 | `examples/tutorial_liver_met_visium.ipynb` | ✅ pre-executed, outputs committed |
 | `examples/function_by_function_R_parity.ipynb` | ✅ pre-executed, outputs committed |
@@ -330,11 +348,6 @@ with them the `valid` flags and `nulls` sets are **exact**.
 
 ### 6.4 Not covered
 
-- **Multi-batch runs.** `MergeObjects` is parity-tested for object construction,
-  but no *multi-batch* `niche_DE` fit is in the gate, because the canonical
-  fixture is a single section. The multi-batch code path (factor `batchvar`,
-  `fastDummies` treatment contrasts) is implemented and unit-tested but its
-  numbers are not pinned against R.
 - **`Int = FALSE`** is parity-tested on a log1p-transformed copy of the same
   counts (300 genes), not on genuinely continuous assay data.
 - **`CreateLibraryMatrix`'s downsampling branch** (>1000 cells per type) draws
