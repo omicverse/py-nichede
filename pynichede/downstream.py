@@ -256,7 +256,7 @@ def _finish_lr(lr_mat, ligands, L_genes, receptor_beta, receptor_p, top_DE, alph
     if df.empty:
         raise ValueError("no ligand-receptor pairs to report")
     out = df[["ligand", "receptor"]].copy()
-    out["top_downstream_niche_DE_genes"] = [top_DE.get(l, "") for l in out["ligand"]]
+    out["top_downstream_niche_DE_genes"] = [top_DE.get(lig, "") for lig in out["ligand"]]
     return out.reset_index(drop=True)
 
 
@@ -292,9 +292,12 @@ def niche_LR_spot(obj, ligand_cell: str, receptor_cell: str, ligand_target_matri
         nst = num_cells[sel].copy()
         nst[:, Lv[:, ig] < CT_filter] = 0.0
         if Lv[niche, ig] < CT_filter[niche]:
-            lig_beta.append(np.nan); lig_p.append(np.nan); continue
+            lig_beta.append(np.nan)
+            lig_p.append(np.nan)
+            continue
         b, p = _glm_celltype_test(Y, nst, niche)
-        lig_beta.append(b); lig_p.append(p)
+        lig_beta.append(b)
+        lig_p.append(p)
 
     lig_p = p_adjust(np.asarray(lig_p, dtype=np.float64), "BH")
     lig_beta = np.asarray(lig_beta, dtype=np.float64)
@@ -317,9 +320,12 @@ def niche_LR_spot(obj, ligand_cell: str, receptor_cell: str, ligand_target_matri
         nst = num_cells[sel].copy()
         nst[:, Lv[:, il] < CT_filter] = 0.0
         if Lv[index, il] < CT_filter[index]:
-            rec_beta.append(np.nan); rec_p.append(np.nan); continue
+            rec_beta.append(np.nan)
+            rec_p.append(np.nan)
+            continue
         b, p = _glm_celltype_test(Y, nst, index)
-        rec_beta.append(b); rec_p.append(p)
+        rec_beta.append(b)
+        rec_p.append(p)
 
     return _finish_lr(sub, ligands, L_genes, rec_beta, rec_p, top_DE, alpha)
 

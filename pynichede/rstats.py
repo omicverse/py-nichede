@@ -11,9 +11,12 @@ off-the-shelf Python equivalents behave *differently*:
 * ``stats::optimize`` — Brent's ``fmin`` with R's default
   ``tol = .Machine$double.eps^0.25``.  ``scipy.optimize.minimize_scalar`` uses a
   different bracketing and termination rule.
-* ``stats::p.adjust(method = "BH")`` — the BH factor uses ``n = length(p)``
-  *including* ``NA`` entries while the ranks use only the non-``NA`` ones.
-  ``statsmodels.stats.multitest`` drops the ``NA``s from both.
+* ``stats::p.adjust(method = "BH")`` — the ``n = length(p)`` default is
+  **lazy**, so it is forced only *after* the body has dropped the ``NA``s and
+  therefore equals the non-``NA`` count, while ``NA``s are written back into the
+  output at their original positions.  ``statsmodels.stats.multitest`` has no
+  equivalent; getting this wrong inflates every adjusted p-value by
+  ``n_total / n_valid``.
 * ``stats::quantile(type = 7)`` — the R default; ``numpy.quantile``'s default
   ``method="linear"`` happens to agree, but this module states it explicitly so
   the equivalence is auditable.
@@ -88,9 +91,9 @@ def dqrdc2(x: np.ndarray, tol: float = 1e-7):
     k = p + 1  # Fortran 1-based "first negligible column"
 
     for l0 in range(lup):            # l0 is 0-based; Fortran l = l0 + 1
-        l = l0 + 1
+        lf = l0 + 1                  # the Fortran loop index, for the tests below
         # --- cycle negligible columns to the right edge -------------------
-        while not (l >= k or qraux[l0] >= work2[l0] * tol):
+        while not (lf >= k or qraux[l0] >= work2[l0] * tol):
             # rotate columns l..p one step left, moving column l to the end
             col = x[:, l0].copy()
             x[:, l0:p - 1] = x[:, l0 + 1:p]
@@ -104,7 +107,7 @@ def dqrdc2(x: np.ndarray, tol: float = 1e-7):
             jpvt[p - 1], qraux[p - 1], work1[p - 1], work2[p - 1] = i_, t_, tt_, ttt_
             k -= 1
 
-        if l == n:
+        if lf == n:
             continue
 
         # --- Householder transformation for column l ----------------------
