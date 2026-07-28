@@ -1,0 +1,122 @@
+# Pre-registered parity gate for `py-nichede`
+#
+# COMMITTED BEFORE THE AGENT LOOP BEGINS (Omicverse-RebuildR PROTOCOL.md Step 0/1).
+# These fields are READ-ONLY after Step 3 starts.
+# Do not tighten or loosen any `threshold` to make the port pass.
+
+package: py-nichede
+upstream:
+  name: nicheDE
+  version: "0.0.0.9000"
+  source: GitHub
+  url: https://github.com/kaishumason/NicheDE
+  commit: 87e0e89bb066702a54fa47638965b61dc6f24d05
+  paper: "Mason K. et al., Niche-DE: niche-differential gene expression analysis in
+    spatial transcriptomics data identifies context-dependent cell-cell interactions.
+    Genome Biology 25, 14 (2024). PMC10785550"
+
+# Primary algorithm class. Niche-DE's headline output is a per-(index,niche,gene)
+# Wald test statistic and the multi-resolution p-values derived from it, so the
+# port is graded as a *statistical inference* port (PARITY_TAXONOMY.md class 8)
+# with an additional ordinal (Pearson/Spearman) gate on the raw test statistic
+# and deterministic gates on the upstream object-construction matrices.
+algorithm_class: inference
+parity_threshold: 0.90        # Spearman on -log10 p, primary gate
+
+# Canonical fixture — the fixture shipped inside the upstream R package itself
+# (`data/vignette_*.rda`): a real 10x Visium human liver-metastasis section used
+# by the upstream vignette. Public, deterministic, no simulation.
+fixture:
+  path: data/fixture_vignette.npz
+  source: "nicheDE::vignette_counts / vignette_coord / vignette_library_matrix / vignette_deconv_mat"
+  description: "10x Visium liver metastasis, 848 spots x 36601 genes, 7 RCTD cell types"
+  expected_shape: [848, 36601]
+
+reference_command: tests/r_reference_driver.R
+
+seed: 42
+
+# Niche-DE is fully deterministic given the inputs (no RNG on this fixture:
+# CreateLibraryMatrix's downsampling branch is not reached, and the effective
+# niche / GLM path contains no RNG). The seed is set anyway on both sides.
+
+outputs:
+  # ---- Object construction (deterministic, class 1) -------------------------
+  - name: library_matrix
+    type: "matrix (n_celltype x n_gene)"
+    location_reference: "$.library_matrix"
+    location_candidate: "create_library_matrix(data, cell_type)"
+    metric: deterministic-standard
+    threshold: 1.0e-8
+
+  - name: num_cells
+    type: "matrix (n_spot x n_celltype)"
+    location_reference: "$.num_cells"
+    location_candidate: "NicheDE.num_cells"
+    metric: deterministic-standard
+    threshold: 1.0e-8
+
+  - name: effective_niche
+    type: "list of matrices (n_spot x n_celltype), one per sigma"
+    location_reference: "$.effective_niche"
+    location_candidate: "NicheDE.effective_niche"
+    metric: deterministic-standard
+    threshold: 1.0e-8
+
+  # ---- The test statistic (ordinal, class 6) --------------------------------
+  - name: T_stat
+    type: "array (n_celltype x n_celltype x n_gene) per sigma"
+    location_reference: "$.T_stat"
+    location_candidate: "NicheDE.niche_DE[k][gene]['T_stat']"
+    metric: pearson
+    threshold: 0.99
+    secondary:
+      metric: spearman
+      threshold: 0.99
+
+  # ---- The p-values (inference, class 8) ------------------------------------
+  - name: pval_pos_gene_level
+    type: "1d vector (n_gene), BH-adjusted"
+    location_reference: "$.pval_pos.gene_level"
+    location_candidate: "NicheDE.niche_DE_pval_pos['gene_level']"
+    metric: inference
+    threshold: 0.90            # Spearman on -log10 p
+    threshold_top50_jaccard: 0.70
+
+  - name: pval_pos_cell_type_level
+    type: "matrix (n_gene x n_celltype), BH-adjusted"
+    location_reference: "$.pval_pos.cell_type_level"
+    location_candidate: "NicheDE.niche_DE_pval_pos['cell_type_level']"
+    metric: inference
+    threshold: 0.90
+    threshold_top50_jaccard: 0.70
+
+  - name: pval_pos_interaction_level
+    type: "array (n_celltype x n_celltype x n_gene), BH-adjusted"
+    location_reference: "$.pval_pos.interaction_level"
+    location_candidate: "NicheDE.niche_DE_pval_pos['interaction_level']"
+    metric: inference
+    threshold: 0.90
+    threshold_top50_jaccard: 0.70
+
+  - name: pval_neg_gene_level
+    type: "1d vector (n_gene), BH-adjusted"
+    location_reference: "$.pval_neg.gene_level"
+    location_candidate: "NicheDE.niche_DE_pval_neg['gene_level']"
+    metric: inference
+    threshold: 0.90
+    threshold_top50_jaccard: 0.70
+
+held_out_fixture:
+  path: null
+  description: null
+
+acceleration:
+  enabled: true
+  max_iterations: 20
+  must_pass_gate: true
+
+audit_class: null
+
+created_by: omicverse-rebuildr agent
+created_at: 2026-07-28

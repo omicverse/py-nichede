@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynichede"
+version = "0.1.0"
+description = "Pure-Python Niche-DE — niche-differential gene expression and context-dependent cell-cell interactions in spatial transcriptomics, AnnData-native."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Zehua Zeng", email = "starlitnightly@163.com" },
+]
+keywords = [
+    "spatial-transcriptomics", "niche-DE", "nicheDE", "cell-cell-interaction",
+    "differential-expression", "ligand-receptor", "visium", "scanpy", "anndata",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.10",
+    "pandas>=1.5",
+    "anndata>=0.9",
+    "joblib>=1.2",
+    "threadpoolctl>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-cov", "ruff", "pyyaml", "matplotlib", "jupyter", "nbconvert"]
+
+[project.urls]
+Homepage = "https://github.com/omicverse/py-nichede"
+Repository = "https://github.com/omicverse/py-nichede"
+Issues = "https://github.com/omicverse/py-nichede/issues"
+"Upstream R package" = "https://github.com/kaishumason/NicheDE"
+"Upstream (omicverse)" = "https://github.com/Starlitnightly/omicverse"
+
+[tool.setuptools.packages.find]
+include = ["pynichede*"]
+exclude = ["tests*", "examples*", "nichede-ref*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+    "ignore::RuntimeWarning",
+    "ignore::UserWarning",
+]
