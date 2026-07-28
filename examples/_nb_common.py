@@ -40,7 +40,8 @@ def write_notebook(cells, path: str):
 
 PREAMBLE = r'''
 %matplotlib inline
-import os, sys, json, re, time, subprocess, warnings
+import os
+import tempfile, sys, json, re, time, subprocess, warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -55,7 +56,10 @@ RSCRIPT  = os.environ.get("NICHEDE_RSCRIPT",     "/scratch/users/steorra/env/CMA
 R_LIBS   = os.environ.get("NICHEDE_R_LIBS",      "/scratch/users/steorra/Rlibs_nichede")
 N_JOBS   = int(os.environ.get("NICHEDE_N_JOBS", "16"))
 
-os.environ.setdefault("TMPDIR", "/scratch/users/steorra/tmp")
+# Everything else here is an overridable os.environ.get default; this one was a
+# setdefault onto an absolute path that exists on one machine, so re-running these
+# notebooks anywhere else pointed TMPDIR at a directory that is not there.
+os.environ.setdefault("TMPDIR", tempfile.gettempdir())
 os.environ.setdefault("JOBLIB_TEMP_FOLDER", os.environ["TMPDIR"])
 os.makedirs(os.environ["TMPDIR"], exist_ok=True)
 for _p in (PKG_ROOT, os.path.join(PKG_ROOT, "tests")):
