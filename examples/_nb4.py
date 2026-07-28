@@ -41,6 +41,13 @@ BH p-values correlated at only Spearman 0.859, and the `Int=FALSE` linear-model 
 **no** valid genes at all. Those are equivalence bugs, not acceleration opportunities, so
 iterations 1–3 fixed them before any performance work began.
 
+**How to read the wall clock on the plots.** `ITERATION_LOG.md`'s baseline figure is a
+*controlled ablation*: the shipped pipeline with the two pre-acceleration code paths (iters 5
+and 7) put back, timed in the same process, rather than an archived timing from a different
+run. The cell below therefore measures the **shipped serial pipeline as it stands today** —
+which is the *post*-acceleration number, not the baseline — so the two are deliberately
+different, and the ablation that produces the baseline is re-measured in iteration 7's cell.
+
 [ITER_LOG ↩](../ITERATION_LOG.md)
 """,
   r'''
@@ -226,7 +233,10 @@ is the rank-1 matrix with entry `v[a] w[b]`, and `as.vector` flattens column-maj
 Every output entry is a **single multiplication of the same two f64 operands**, so the result
 is bit-identical rather than merely equal to rounding (`MATH.md` §1.1).
 
-**Expected effect.** A large speedup on the step itself, no change whatsoever to parity.
+**Expected effect.** A large speedup on the **step** and no change whatsoever to parity — but
+the design build is only about 1% of `niche_DE`, so `ITERATION_LOG.md` deliberately claims **no
+pipeline speedup** for this rewrite. It is kept because it is free and exact, not because it
+moves the total.
 
 [ITER_LOG ↩](../ITERATION_LOG.md)
 """,
@@ -286,7 +296,14 @@ because `Matrix::chol` *raising* on a non-positive-definite `X'WX` is load-beari
 makes `nicheDE` mark such a gene invalid, and `scipy.linalg.cholesky` raises `LinAlgError` in
 the same situation, so the control flow is preserved.
 
-**Expected effect.** A large speedup on the step; parity flat.
+**Expected effect, and honest attribution.** Large on the step, and parity flat. At *pipeline*
+level, though, `ITERATION_LOG.md`'s ablation shows this rewrite is worth **1.00x on its own**
+(1.917 s with the explicit inverse restored vs 1.923 s shipped, BLAS still pinned): the two
+variants cost the same once the thread pool is already limited. Its value is **joint with
+iteration 7** — the explicit `solve_triangular(A, I)` is what made a wide BLAS pool expensive,
+so removing either one removes the cost, and the 8.0x is booked once against the pair rather
+than twice. Accepting an exact, strictly-cheaper identity with zero downside is still the right
+call when its solo attribution is zero.
 
 [ITER_LOG ↩](../ITERATION_LOG.md)
 """,
@@ -339,8 +356,12 @@ side)`; the table depends on nothing else. Hoisting its construction behind a ca
 memoisation of a pure function, with bit-identical output (measured max abs deviation 0.0,
 `MATH.md` §1.3).
 
-**Expected effect.** Several thousand-fold on the step, and it is the difference between the
-Brown-pooling stage being a rounding error and being the whole run. Parity flat.
+**Expected effect.** Several orders of magnitude on the step. Like iteration 4 this is logged
+as **step-level with no pipeline delta claimed** — the cache was present from the first working
+version, so it never shows up as a pipeline *difference*; it is recorded because removing it is
+catastrophic and a future maintainer needs to know the `lru_cache` is load-bearing. It is also
+why every timing in the log is warmup-excluded: the first `niche_DE` call in a fresh process
+pays the table build once. Parity flat.
 
 [ITER_LOG ↩](../ITERATION_LOG.md)
 """,
@@ -390,16 +411,70 @@ here (`syrk`, `potrf`, `trsm`), because those routines partition by **output blo
 reduction — so no summation order changes. Verified empirically as well: the complete parity
 report is unchanged, digit for digit, before and after (`MATH.md` §1.4).
 
-**Expected effect.** ~5–6× on the single-process pipeline with parity exactly flat. The cell
-below measures it by calling the package's own `_run_sigma` under the two thread budgets.
+**Expected effect, and honest attribution.** `ITERATION_LOG.md` books **8.02x jointly against
+iterations 5 + 7**, and is explicit that ablating *only* the thread pinning is worth just
+**1.08x** (2.085 ± 0.096 s vs the shipped 1.923 ± 0.004 s), while ablating the pinning **and**
+the `cho_solve` identity together costs 15.43 ± 2.05 s. The two are redundant fixes for the same
+bottleneck. The cell below re-measures the solo effect live on the canonical full fixture, so
+the reader can check that 1.08x figure rather than take it on trust; the *parity* half of the
+claim — that the thread budget cannot change the result — is checked second and holds
+unconditionally.
 
 [ITER_LOG ↩](../ITERATION_LOG.md)
 """,
   r'''
 from pynichede.niche_de import _run_sigma
 from pynichede.rstats import r_quantile
-from threadpoolctl import threadpool_limits
+from threadpoolctl import threadpool_limits, threadpool_info
 
+print("BLAS pools visible to this process:",
+      [(a["internal_api"], a["num_threads"]) for a in threadpool_info()])
+
+# Measure on the CANONICAL FULL fixture: the dev fixture only has ~100 runnable
+# genes, far too little arithmetic for a thread-pool effect to be visible.
+of = nde.create_nichede_object(fcounts, fcoord, flibmat, fdeconv, sigma=fsigma, Int=True)
+of = nde.calculate_effective_niche(of, cutoff=0.05)
+fcnt = np.asarray(of.counts, dtype=float)
+fncl = np.asarray(of.num_cells, dtype=float)
+frex = np.asarray(of.ref_expr, dtype=float)
+fbid = np.asarray(of.batch_ID)
+fctf = np.array([r_quantile(frex[i], 0.8) for i in range(frex.shape[0])])
+fargs = (fcnt, of.effective_niche[0], fncl, fctf, 150, 10, True, True, fbid, frex,
+         len(fcts), False, 1, False)
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    with threadpool_limits(limits=N_CPU):
+        t0 = time.perf_counter(); r_multi = _run_sigma(*fargs); t_multi = time.perf_counter() - t0
+    with threadpool_limits(limits=1):
+        t0 = time.perf_counter(); r_one = _run_sigma(*fargs); t_one = time.perf_counter() - t0
+
+Ta = np.array([r["T_stat"] if r["valid"] == 1 else np.full((len(fcts),) * 2, np.nan)
+               for r in r_multi])
+Tb = np.array([r["T_stat"] if r["valid"] == 1 else np.full((len(fcts),) * 2, np.nan)
+               for r in r_one])
+m = np.isfinite(Ta) & np.isfinite(Tb)
+err = float(np.max(np.abs(Ta[m] - Tb[m])))
+abl = float(logged(7, "ablation_this_change_only_s"))
+shipped = float(logged(7, "wall_clock_mean_s"))
+joint = float(logged(7, "speedup_vs_previous"))
+print(f"full fixture, ONE kernel bandwidth, single process:")
+print(f"  BLAS pool = {N_CPU} threads : {t_multi:6.2f} s")
+print(f"  BLAS pool = 1  thread    : {t_one:6.2f} s   -> {t_multi / t_one:.2f}x measured now")
+print(f"  ITERATION_LOG.md solo ablation : {abl:.3f} s vs {shipped:.3f} s shipped "
+      f"= {abl / shipped:.2f}x")
+print(f"  ITERATION_LOG.md joint 5+7     : {joint:.2f}x")
+print(f"  -> the live {t_multi / t_one:.2f}x corroborates the logged SOLO figure "
+      f"({abl / shipped:.2f}x), not the joint one.")
+print(f"max abs difference in T_stat between the two thread budgets: {err:.3e}"
+      f"   <- the admissibility claim, and it holds exactly")
+iter_panel(7, extra=(f"full fixture, one sigma: {t_multi:.2f} s with {N_CPU} BLAS threads -> "
+                     f"{t_one:.2f} s with 1 ({t_multi/t_one:.2f}x live, vs the logged solo "
+                     f"ablation {abl/shipped:.2f}x); T_stat identical to {err:.1e}"),
+           bars=("_run_sigma, full fixture, one bandwidth",
+                 [f"{N_CPU} BLAS threads", "1 BLAS thread"], [t_multi, t_one]))
+
+# the dev-fixture arrays iterations 8 and 10 reuse
 cnt = np.asarray(dcounts, dtype=float)
 ncl = np.asarray(o.num_cells, dtype=float)
 rex = np.asarray(o.ref_expr, dtype=float)
@@ -407,25 +482,12 @@ bid = np.asarray(o.batch_ID)
 ctf = np.array([r_quantile(rex[i], 0.8) for i in range(rex.shape[0])])
 args = (cnt, o.effective_niche[0], ncl, ctf, 150, 10, True, True, bid, rex,
         len(dcts), False, 1, False)
-
-with threadpool_limits(limits=N_CPU):
-    t0 = time.perf_counter(); r_multi = _run_sigma(*args); t_multi = time.perf_counter() - t0
-with threadpool_limits(limits=1):
-    t0 = time.perf_counter(); r_one = _run_sigma(*args); t_one = time.perf_counter() - t0
-
-Ta = np.array([r["T_stat"] if r["valid"] == 1 else np.full((len(dcts),) * 2, np.nan)
-               for r in r_multi])
-Tb = np.array([r["T_stat"] if r["valid"] == 1 else np.full((len(dcts),) * 2, np.nan)
-               for r in r_one])
-m = np.isfinite(Ta) & np.isfinite(Tb)
-err = float(np.max(np.abs(Ta[m] - Tb[m])))
-print(f"BLAS pool = {N_CPU} threads : {t_multi:6.2f} s  (one kernel bandwidth)")
-print(f"BLAS pool = 1  thread   : {t_one:6.2f} s   -> {t_multi / t_one:.2f}x")
-print(f"max abs difference in T_stat between the two runs: {err:.3e}")
-iter_panel(7, extra=(f"one sigma: {t_multi:.2f} s with {N_CPU} BLAS threads -> {t_one:.2f} s "
-                     f"with 1 ({t_multi/t_one:.2f}x); T_stat identical to {err:.1e}"),
-           bars=("_run_sigma, one bandwidth", [f"{N_CPU} BLAS threads", "1 BLAS thread"],
-                 [t_multi, t_one]))
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    with threadpool_limits(limits=1):
+        t0 = time.perf_counter(); r_dev_one = _run_sigma(*args)
+        t_dev_one = time.perf_counter() - t0
+print(f"\n(dev fixture, one bandwidth, serial, for iterations 8-10: {t_dev_one:.2f} s)")
 ''')
 
 I(8, "REJECTED — one joblib task per gene",
@@ -438,11 +500,13 @@ read-only arrays (`effective_niche`, `num_cells`, `ref_expr`) and writes only it
 dict — so any partition of the gene index set is admissible, and R itself parallelises over
 exactly this axis.
 
-**What happened.** It was **slower than serial**. Measured 33.95 s serial → 56.68 s with
-`n_jobs=8` and 48.05 s with `n_jobs=16`: a 0.6× "speedup". Two causes, both confirmed by
-profiling: joblib re-pickled the shared arrays for every small task, so transfer dominated the
-few milliseconds of actual arithmetic; and each loky worker opened its **own** full-width BLAS
-pool, so 16 workers × 17 threads thrashed a 17-core box.
+**What happened.** It was **slower than serial**, badly. The log's controlled ablation puts
+per-gene dispatch at 14.34 ± 2.06 s against the shipped chunked dispatch's 0.686 ± 0.007 s —
+**20.9× slower**, and slower even than the 1.923 s single-process path. Two causes, both
+confirmed by profiling: joblib re-pickled the shared `effective_niche` / `num_cells` /
+`ref_expr` arrays for every small task, so transfer dominated the few milliseconds of actual
+arithmetic; and each loky worker opened its **own** full-width BLAS pool, so 8 workers × 17
+threads thrashed a 17-core box.
 
 **Decision: REJECT_SLOW.** Rolled back and replaced by iteration 9, which keeps the same
 admissibility argument but changes the partition granularity and the per-worker thread budget.
@@ -470,21 +534,29 @@ def per_gene_dispatch(n_jobs):
             for g in runnable)
     return [r for blk in out for r in blk]
 
-t0 = time.perf_counter(); res_rej = per_gene_dispatch(8); T_REJECTED = time.perf_counter() - t0
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    t0 = time.perf_counter(); res_rej = per_gene_dispatch(8)
+    T_REJECTED = time.perf_counter() - t0
 Tr = np.array([r["T_stat"] if r["valid"] == 1 else np.full((len(dcts),) * 2, np.nan)
                for r in res_rej])
-Tk = np.array([r_one[g]["T_stat"] if r_one[g]["valid"] == 1
+Tk = np.array([r_dev_one[g]["T_stat"] if r_dev_one[g]["valid"] == 1
                else np.full((len(dcts),) * 2, np.nan) for g in runnable])
 mm = np.isfinite(Tr) & np.isfinite(Tk)
 print(f"per-gene joblib tasks (n_jobs=8), one bandwidth : {T_REJECTED:6.2f} s")
-print(f"serial with the shipped code, one bandwidth      : {t_one:6.2f} s")
-print(f"-> speedup {t_one / T_REJECTED:.2f}x   (< 1 means SLOWER than serial)")
+print(f"serial with the shipped code, one bandwidth      : {t_dev_one:6.2f} s")
+print(f"-> speedup {t_dev_one / T_REJECTED:.2f}x   (< 1 means SLOWER than serial)")
+lg = float(logged(8, "speedup_vs_previous"))
+print(f"ITERATION_LOG.md records {lg:.3f}x for this rewrite (vs the shipped chunked path); "
+      f"measured here against the serial path: {t_dev_one / T_REJECTED:.2f}x")
+print("-- different denominators, same verdict: parallelising per gene is a regression.")
 print(f"parity was never the issue: max |T_stat difference| = "
       f"{float(np.max(np.abs(Tr[mm] - Tk[mm]))):.3e}")
-iter_panel(8, extra=(f"REJECTED: per-gene dispatch {T_REJECTED:.2f} s vs serial {t_one:.2f} s "
-                     f"= {t_one/T_REJECTED:.2f}x (slower); parity unchanged"),
-           bars=("one bandwidth", ["serial", "per-gene joblib (REJECTED)"],
-                 [t_one, T_REJECTED]), bar_colors=["#888888", C_BAD])
+iter_panel(8, extra=(f"REJECTED: per-gene dispatch {T_REJECTED:.2f} s vs serial "
+                     f"{t_dev_one:.2f} s = {t_dev_one/T_REJECTED:.2f}x (slower); "
+                     f"parity unchanged"),
+           bars=("dev fixture, one bandwidth", ["serial", "per-gene joblib (REJECTED)"],
+                 [t_dev_one, T_REJECTED]), bar_colors=["#888888", C_BAD])
 ''')
 
 I(9, "Acceleration — chunked dispatch + `inner_max_num_threads=1`",
@@ -524,6 +596,8 @@ print(f"shipped chunked dispatch, {N_JOBS} workers, all 3 bandwidths : {T_CHUNKE
 print(f"shipped serial run (iteration 0 cell)                     : {T_SHIPPED_SERIAL:6.2f} s")
 print(f"-> {T_SHIPPED_SERIAL / T_CHUNKED:.2f}x, and vs R's {R_T_DEV:.2f} s on "
       f"{R_CORES_DEV} cores: {R_T_DEV / T_CHUNKED:.1f}x")
+print(f"ITERATION_LOG.md records {float(logged(9, 'speedup_vs_previous')):.2f}x vs serial and "
+      f"{float(logged(9, 'speedup_vs_baseline')):.1f}x vs the controlled baseline")
 print(f"T_stat Pearson vs R                : {st['pearson']:.6f}")
 print(f"max |T_stat| difference vs the serial run: {same:.3e}  (element-for-element identical)")
 iter_panel(9, extra=(f"chunked dispatch {T_CHUNKED:.2f} s vs serial {T_SHIPPED_SERIAL:.2f} s "
@@ -550,7 +624,10 @@ branch of `niche_DE_core` — so evaluating them earlier is the same predicate a
 same point in the control flow, on the same values. Verified: `valid`-flag agreement stays at
 1.000000 and the parity report is unchanged.
 
-**Expected effect.** Roughly a further 1.5–2×, concentrated in the parallel path. This was the
+**Expected effect.** `ITERATION_LOG.md` folds this into the 0.686 s chunked-dispatch figure and
+claims **1.00x of its own** on the dev fixture, noting that it matters most on the full fixture
+where ~78% of genes are removed rather than ~68%. The cell below measures both the removal
+fraction and the parallel-path timing on the canonical full fixture. This was the
 last accepted rewrite; the loop then stopped because the remaining runtime is dominated by the
 per-gene IRLS (already a rank-truncated QR at minimum arithmetic cost) and the Brown/Cauchy
 pooling (already vectorised).
@@ -569,24 +646,42 @@ frac = 1 - f_runnable.size / fcnt.shape[1]
 print(f"full fixture: {f_runnable.size} of {fcnt.shape[1]} genes are ever fitted "
       f"-> the prefilter removes {frac * 100:.1f}% of the tasks")
 
-# Cost of NOT prefiltering: dispatch every gene through the worker instead.
-t0 = time.perf_counter()
-res_all = _chunk_worker(np.arange(cnt.shape[1]), cnt, o.effective_niche[0], ncl, ctf,
-                        150, 10, True, True, bid, rex, len(dcts), False)
-T_NOFILTER = time.perf_counter() - t0
-t0 = time.perf_counter()
-res_pre = _run_sigma(*args)
-T_PREFILTER = time.perf_counter() - t0
+# Cost of NOT prefiltering, measured where the claim lives: the PARALLEL path on
+# the full fixture, where every unfiltered gene also costs a pickled counts column.
+def par_dispatch(idx, n_jobs):
+    n_chunks = min(idx.size, max(1, n_jobs * 4))
+    splits = [s for s in np.array_split(idx, n_chunks) if s.size]
+    with parallel_backend("loky", n_jobs=n_jobs, inner_max_num_threads=1):
+        out = Parallel(verbose=0)(
+            delayed(_chunk_worker)(s, fcnt[:, s], of.effective_niche[0], fncl, fctf,
+                                   150, 10, True, True, fbid, frex, len(fcts), False)
+            for s in splits)
+    return [r for blk in out for r in blk]
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    with threadpool_limits(limits=1):
+        t0 = time.perf_counter()
+        res_all = par_dispatch(np.arange(fcnt.shape[1]), N_JOBS)
+        T_NOFILTER = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        res_pre = _run_sigma(fcnt, of.effective_niche[0], fncl, fctf, 150, 10, True, True,
+                             fbid, frex, len(fcts), False, N_JOBS, False)
+        T_PREFILTER = time.perf_counter() - t0
 va = np.array([r["valid"] for r in res_all]); vb = np.array([r["valid"] for r in res_pre])
-print(f"all {cnt.shape[1]} genes through the worker : {T_NOFILTER:6.2f} s")
-print(f"prefiltered (shipped)                    : {T_PREFILTER:6.2f} s "
+print(f"all {fcnt.shape[1]} genes dispatched, {N_JOBS} workers : {T_NOFILTER:6.2f} s")
+print(f"prefiltered to {f_runnable.size} genes (shipped)      : {T_PREFILTER:6.2f} s "
       f"-> {T_NOFILTER / T_PREFILTER:.2f}x")
-print(f"valid flags identical either way: {bool((va == vb).all())}")
+print(f"ITERATION_LOG.md claims {float(logged(10, 'speedup_vs_previous')):.2f}x of its own "
+      f"on the dev fixture; measured here on the FULL fixture: "
+      f"{T_NOFILTER / T_PREFILTER:.2f}x")
+print(f"valid flags identical either way: {bool((va == vb).all())}"
+      f"   <- the admissibility claim")
 iter_panel(10, extra=(f"prefilter removes {frac*100:.1f}% of genes on the full fixture; "
                       f"{T_NOFILTER:.2f} s -> {T_PREFILTER:.2f} s "
                       f"({T_NOFILTER/T_PREFILTER:.2f}x), identical valid flags"),
-           bars=("_run_sigma, one bandwidth", ["every gene", "prefiltered"],
-                 [T_NOFILTER, T_PREFILTER]))
+           bars=(f"full fixture, one bandwidth, {N_JOBS} workers",
+                 ["every gene", "prefiltered"], [T_NOFILTER, T_PREFILTER]))
 ''')
 
 
@@ -685,11 +780,15 @@ for header, body in re.findall(r"^##\s+(.+?)\n(.*?)(?=^##\s|\Z)", raw, re.S | re
 blocks.sort(key=lambda b: b["iter"])
 LOG = pd.DataFrame(blocks)
 
-# iters 4-6 are STEP-level micro-benchmarks (sub-millisecond); 0-3 and 7-10 are
-# pipeline-level wall clocks on the dev fixture.  Keep them apart on the plots.
-STEP_LEVEL = {4, 5, 6}
-LOG["scope"] = np.where(LOG["iter"].isin(STEP_LEVEL), "step micro-benchmark", "pipeline")
+# Every block now carries a PIPELINE wall clock on the dev fixture (the log was
+# revised to use controlled ablations rather than cross-process comparisons), so
+# the series is directly plottable.  Blocks whose notes begin "STEP-LEVEL" claim
+# no pipeline delta of their own and are flagged so the plot cannot mislead.
 LOG["status"] = LOG["status"].fillna("baseline")
+LOG["scope"] = np.where(LOG["notes"].fillna("").str.strip().str.startswith("STEP-LEVEL"),
+                        "step-level (no pipeline delta claimed)", "pipeline")
+LOG["joint"] = LOG.get("joint_with_iter5", pd.Series([np.nan] * len(LOG))).notna() | \
+               LOG.get("joint_with_iter7", pd.Series([np.nan] * len(LOG))).notna()
 display(LOG[["iter", "_header", "status", "admissibility", "wall_clock_mean_s",
              "parity_metric", "parity_passes", "scope"]])
 N_ITERS = len(LOG)
@@ -737,24 +836,25 @@ def _adjust_like_R(arr, level):
             out[k, :, g] = p_adjust(a[k, :, g], "BH")
     return out
 
-def _series():
-    pipe = LOG[LOG["scope"] == "pipeline"]
-    step = LOG[LOG["scope"] == "step micro-benchmark"]
-    return pipe, step
+def logged(it, field):
+    """Read a field of one iteration straight out of ITERATION_LOG.md."""
+    v = LOG.loc[LOG["iter"] == it, field]
+    return None if not len(v) or pd.isna(v.iloc[0]) else v.iloc[0]
 
 def iter_panel(n, extra="", bars=None, bar_colors=None):
     """The subplot NOTEBOOKS.md requires for every iteration block."""
-    pipe, step = _series()
     ncol = 3 if bars else 2
     fig, ax = plt.subplots(1, ncol, figsize=(4.6 * ncol, 3.5))
 
-    p_now = pipe[pipe["iter"] <= n]
-    s_now = step[step["iter"] <= n]
-    ax[0].plot(p_now["iter"], p_now["wall_clock_mean_s"], "o-", color=C_PY,
-               label="pipeline (dev fixture)")
-    if len(s_now):
-        ax[0].plot(s_now["iter"], s_now["wall_clock_mean_s"], "s", color="#7b4fa0",
-                   label="step micro-benchmark")
+    p_now = LOG[LOG["iter"] <= n]
+    ax[0].errorbar(p_now["iter"], p_now["wall_clock_mean_s"],
+                   yerr=p_now["wall_clock_stddev_s"].fillna(0.0),
+                   fmt="o-", color=C_PY, capsize=3,
+                   label="pipeline wall clock (dev fixture)")
+    stp = p_now[p_now["scope"].str.startswith("step-level")]
+    if len(stp):
+        ax[0].scatter(stp["iter"], stp["wall_clock_mean_s"], marker="s", s=55,
+                      color="#7b4fa0", zorder=4, label="step-level (no pipeline delta)")
     ax[0].axhline(R_T_DEV, ls="--", color=C_R, lw=1,
                   label=f"R reference {R_T_DEV:.1f} s ({R_CORES_DEV} cores)")
     row = LOG[LOG["iter"] == n].iloc[0]
@@ -815,13 +915,15 @@ line. Right: the pre-registered parity metric against iteration, with the 0.99 g
 dashed line, the rejected iteration in red, and the cumulative speedup annotated.
 """))
     C.append(code(r'''
-pipe, step = _series()
 fig, ax = plt.subplots(1, 2, figsize=(12.5, 4.6))
 
-ax[0].plot(pipe["iter"], pipe["wall_clock_mean_s"], "o-", color=C_PY, lw=1.8, ms=8,
-           label="pipeline wall clock (dev fixture, 300 genes x 3 kernels)")
-ax[0].plot(step["iter"], step["wall_clock_mean_s"], "s", color="#7b4fa0", ms=9,
-           label="step-level micro-benchmark (iters 4-6)")
+ax[0].errorbar(LOG["iter"], LOG["wall_clock_mean_s"],
+               yerr=LOG["wall_clock_stddev_s"].fillna(0.0),
+               fmt="o-", color=C_PY, lw=1.8, ms=8, capsize=3,
+               label="pipeline wall clock (dev fixture, 300 genes x 3 kernels)")
+stp = LOG[LOG["scope"].str.startswith("step-level")]
+ax[0].scatter(stp["iter"], stp["wall_clock_mean_s"], marker="s", s=90, color="#7b4fa0",
+              zorder=4, label="step-level rewrite (no pipeline delta claimed)")
 rej = LOG[LOG["status"].astype(str).str.startswith("REJECT")]
 ax[0].scatter(rej["iter"], rej["wall_clock_mean_s"], s=230, facecolors="none",
               edgecolors=C_BAD, linewidths=2.4, zorder=6, label="REJECTED")
@@ -836,7 +938,7 @@ ax[0].set_title("py-nichede: wall clock by iteration")
 ax[0].legend(fontsize=7, loc="center left")
 
 base = float(LOG.loc[LOG["iter"] == 0, "wall_clock_mean_s"].iloc[0])
-final = float(pipe["wall_clock_mean_s"].iloc[-1])
+final = float(LOG["wall_clock_mean_s"].iloc[-1])
 colr = [C_BAD if str(s).startswith("REJECT") else "#2e7d32" for s in LOG["status"]]
 ax[1].plot(LOG["iter"], LOG["parity_metric"], "-", color=C_PY, lw=1.6, zorder=1)
 ax[1].scatter(LOG["iter"], LOG["parity_metric"], c=colr, s=90, zorder=2, edgecolors="k",
@@ -891,10 +993,17 @@ print(f"no iteration ever dropped below the pre-registered gate "
 
 * **11 blocks, one per `ITERATION_LOG.md` entry**, including the rejection. Iteration 8 tried
   the most obvious parallelisation — one joblib task per gene, exactly mirroring R's
-  `foreach %dopar%` — and made the pipeline **0.6× as fast as serial**. It is kept in the record
-  because the profile that explained the failure (per-task pickling of the shared arrays, and
-  16 workers each opening a 17-thread BLAS pool) is precisely what iteration 9 was designed
-  against.
+  `foreach %dopar%` — and made the pipeline **20.9× slower** than the chunked dispatch that
+  replaced it, and slower even than running serially. It is kept in the record because the
+  profile that explained the failure (per-task pickling of the shared arrays, and every worker
+  opening a 17-thread BLAS pool) is precisely what iteration 9 was designed against.
+
+* **Speedups are attributed by controlled ablation, and two of them are joint.** Iterations 5
+  and 7 are redundant fixes for the same bottleneck: each is worth ~1.0–1.1× alone and 8.0×
+  together, and the log books the 8.0× once against the pair rather than twice against each.
+  Iterations 4 and 6 are logged as step-level with **no pipeline delta claimed at all**. The
+  cells above re-measure these numbers live rather than restating them, and where the live
+  figure differs from the log it is printed side by side instead of being quietly dropped.
 
 * **The first three iterations are equivalence fixes, not optimisations.** Every one of them
   changed *which genes get reported*, and none of them moved the headline parity metric — the

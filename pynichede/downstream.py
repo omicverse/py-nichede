@@ -183,29 +183,45 @@ def _ligand_scores(obj, ligand_target_matrix, index, niche, K, M, truncation_val
     top_DE: dict[str, str] = {}
 
     ltm_index = pd.Index(ltm.index)
+
+    # acceleration: iter 11 — memoise the per-kernel slice of the ligand-target
+    # matrix.  R re-runs this filter-and-reindex inside the per-ligand loop, but
+    # every step of it depends *only* on `top_kernel[ind]`, which takes at most
+    # `len(sigma)` distinct values — so at most `len(sigma)` distinct slices
+    # exist and the rest are recomputations of an identical result.  Exact
+    # memoisation of a pure function (ACCELERATION_PLAYBOOK 1.2); the reindex of
+    # a ~17k x 579 frame goes from once per candidate ligand to once per kernel.
+    _slice_cache: dict[int, tuple] = {}
+
+    def _kernel_slice(k: int):
+        if k not in _slice_cache:
+            sig_k = T_vector[k]
+            keep = ~np.isnan(sig_k)
+            genes_k = genes_all[keep]
+            sig_k = sig_k[keep]
+            common = ltm_index.isin(set(genes_k))
+            lv_k = ltm.loc[common]
+            genes_keep = np.isin(genes_k, lv_k.index.to_numpy())
+            sig_k = sig_k[genes_keep]
+            genes_k = genes_k[genes_keep]
+            lv_k = lv_k.loc[genes_k]             # reorder to the data's gene order
+            _slice_cache[k] = (lv_k.to_numpy(dtype=np.float64),
+                               np.asarray(lv_k.index), sig_k)
+        return _slice_cache[k]
+
     for j, ligand in enumerate(ltm.columns):
         if ligand not in L_genes:
             continue
         ind = L_genes.index(ligand)
-        sig = T_vector[top_kernel[ind]]
-        keep = ~np.isnan(sig)
-        genes = genes_all[keep]
-        sig = sig[keep]
+        lv_vals, lv_index, sig = _kernel_slice(int(top_kernel[ind]))
 
-        common = ltm_index.isin(set(genes))
-        lv = ltm.loc[common]
-        genes_keep = np.isin(genes, lv.index.to_numpy())
-        sig = sig[genes_keep]
-        genes = genes[genes_keep]
-        lv = lv.loc[genes]                       # reorder to the data's gene order
-
-        col = lv.iloc[:, j].to_numpy(dtype=np.float64)
+        col = lv_vals[:, j]
         col = (col - col.mean()) / col.std(ddof=1)          # R's scale()
         top_cors = _order_decreasing(col)[:K]
         weight = col[top_cors] / col[top_cors].mean()
         pear_cor[j] = float(np.sum(sig[top_cors] * weight))
         best5 = _order_decreasing(sig[top_cors] * weight)[:5]
-        top_DE[ligand] = ",".join(np.asarray(lv.index)[top_cors][best5])
+        top_DE[ligand] = ",".join(lv_index[top_cors][best5])
         score_norm[j] = float(np.sum(weight ** 2))
 
     pear_cor = pear_cor / np.sqrt(score_norm)

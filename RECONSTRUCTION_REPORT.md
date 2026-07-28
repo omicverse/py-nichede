@@ -262,7 +262,8 @@ pipeline run with exactly one rewrite reverted, everything else fixed.
 | 7 | §4 scheduling | E (no FLOP change) | 1.08× alone — **8.02× jointly with iter 5** | 0.0 |
 | 9 | §5 parallelisation | E (independent genes) | 2.80× vs serial, 20.9× vs iter 8 | 0.0 |
 | 10 | §1.3 early exit | E (same predicate) | folded into iter 9 | 0.0 |
-| **Final** | — | — | **22.5× vs baseline, 26.1× vs R** | **0.0** |
+| 11 | §1.2 memoisation | E (pure function of the kernel index) | **104.8×** on `niche_LR_*` (314.5 s → 3.0 s) | 0.0 |
+| **Final** | — | — | **22.5× vs baseline on `niche_DE`, 26.1× vs R; 104.8× on `niche_LR_*`** | **0.0** |
 
 **Interaction disclosed:** iters 5 and 7 fix the same bottleneck. Reverting
 either alone costs ~1×; reverting both costs 8.02×. The 8.02× is booked once,
@@ -355,7 +356,20 @@ the dominant systematic contributor to the p-value residual and is the reason
 `pval_*_interaction_level` — which never touches Brown's method — sits at
 exactly 1.000000.
 
-### 6.3 Upstream R defects reproduced on purpose
+### 6.3 `nicheDE`'s `*FromSeurat` constructors are broken on Seurat ≥ 5
+
+`CreateLibraryMatrixFromSeurat` and `CreateNicheDEObjectFromSeurat` read
+`sobj_assay@counts`, a slot that only exists on the v3 `Assay` class; against a
+Seurat v5 `Assay5` object they abort. Generating an R reference for them
+requires `options(Seurat.object.assay.version = "v3")`, which
+`examples/r_per_function_dump.R` sets and records in `meta$seurat_note`. Under
+that setting both constructors reproduce exactly (`0.0` and `4.74e-14`).
+
+The Python equivalents take an `AnnData` and are unaffected — but an R user
+comparing against a modern Seurat object will hit the upstream failure, not a
+port difference.
+
+### 6.4 Upstream R defects reproduced on purpose
 
 Four defects change *which genes get reported*, so they are mirrored rather than
 fixed (full list in `MATH.md` §3.2): the `new_nul` / `var` undefined-symbol typo,
@@ -368,7 +382,7 @@ with them the `valid` flags and `nulls` sets are **exact**.
 **both** R and Python — a matched failure mode, not a port gap. Only
 `niche_LR_spot` produces output here, and it matches R exactly.
 
-### 6.4 Not covered
+### 6.5 Not covered
 
 - **`Int = FALSE`** is parity-tested on a log1p-transformed copy of the same
   counts (300 genes), not on genuinely continuous assay data.

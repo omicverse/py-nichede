@@ -68,7 +68,27 @@ control flow is preserved.
 grid, so caching it is textbook memoisation of a pure function: bit-identical
 output, measured max abs deviation `0.0`.
 
-### 1.4 Thread-count and partition changes (iters 7, 9, 10)
+### 1.4 Memoising the per-kernel ligand-target slice (iter 11)
+
+Inside `niche_LR_spot` / `niche_LR_cell`, R rebuilds the filtered and reordered
+NicheNet matrix once per candidate ligand:
+
+```r
+sig   <- T_vector[[ top_kernel[ind] ]]
+genes <- gene_names[!is.na(sig)]
+lv    <- ligand_target_matrix[rownames(ligand_target_matrix) %in% genes, ]
+lv    <- lv[genes, ]
+```
+
+Every line depends only on `top_kernel[ind] ∈ {1, …, |sigma|}`, so the map
+`k ↦ (lv, sig)` is a pure function with at most `|sigma|` distinct values.
+Caching it is memoisation: the 4th through 579th evaluations return an array
+already computed, bit for bit. Verified by diffing the resulting
+`niche_LR_spot` table against the pre-memoisation run — byte-identical,
+including the comma-joined downstream-gene strings — and against R (9/9 pairs).
+Measured `314.5 s → 3.0 s`, `104.8×`.
+
+### 1.5 Thread-count and partition changes (iters 7, 9, 10)
 
 Limiting the BLAS pool to one thread does not change which floating-point
 operations are performed for `syrk` / `potrf` / `trsm` on a ~848 x 50 design —

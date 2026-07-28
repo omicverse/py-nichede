@@ -465,6 +465,55 @@ ACCEPT.
 
 ---
 
+## iter 11 — acceleration: memoise the per-kernel ligand-target slice
+
+```yaml
+iter: 11
+status: ACCEPT
+action: cache_kernel_ligand_slice
+playbook_section: "§1.2 memoisation"
+admissibility: exact
+admissibility_evidence: |
+  Inside `niche_LR_spot` / `niche_LR_cell`, R re-runs the whole
+  filter-and-reindex of the NicheNet ligand-target matrix once per candidate
+  ligand:
+      sig    <- T_vector[[ top_kernel[ind] ]]
+      genes  <- gene_names[!is.na(sig)]
+      lv     <- ligand_target_matrix[rownames %in% genes, ]
+      lv     <- lv[genes, ]
+  Every line of that depends **only** on `top_kernel[ind]` — the index of the
+  best-fitting kernel for that ligand — which takes at most `length(sigma)`
+  distinct values.  So across the 579 candidate ligands there are at most 3
+  distinct results and the other 576 evaluations recompute an identical array.
+  Hoisting them behind a dict keyed on the kernel index is textbook memoisation
+  of a pure function: bit-identical output, verified by diffing the produced
+  `niche_LR_spot` table against the pre-optimisation run — **byte-identical**,
+  including the `top_downstream_niche_DE_genes` strings — and against R's
+  table (9/9 ligand-receptor pairs identical).
+wall_clock_mean_s: 3.0
+wall_clock_stddev_s: null
+wall_clock_runs_s: [3.0]
+ablation_this_change_only_s: 314.5
+speedup_vs_previous: 104.8
+speedup_vs_baseline: 104.8
+parity_metric: 1.000000
+parity_delta_vs_baseline: 0.0
+parity_passes: true
+notes: |
+  Measured on the canonical full fixture (579 candidate ligands against a
+  16968 x 579 NicheNet matrix): **314.5 s -> 3.0 s, 104.8x**.  This is a
+  separate wall-clock axis from iters 0-10, which time `niche_DE`; niche-LR is
+  a downstream call and was not part of that trajectory.  Surfaced only
+  because building the tutorial notebook made the minutes-long call obvious —
+  a good argument for the protocol's insistence that the notebooks be
+  genuinely executed rather than sketched.
+```
+
+### Decision
+ACCEPT.
+
+---
+
 ## Summary
 
 All wall-clock figures: dev fixture (848 spots x 300 genes x 7 cell types x
@@ -483,6 +532,7 @@ All wall-clock figures: dev fixture (848 spots x 300 genes x 7 cell types x
 | 8 | per-gene joblib tasks | exact | 14.34 +- 2.06 (n_jobs=8) | **0.048x — slower** | 1.000000 | **REJECT_SLOW** |
 | 9 | chunked dispatch, 1 BLAS thread/worker | exact | **0.686 +- 0.007** (n_jobs=8) | 2.80x vs serial, 20.9x vs iter 8 | 1.000000 | ACCEPT |
 | 10 | prefilter runnable genes | exact | 0.686 (n_jobs=8) | folded in; largest effect on the full fixture | 1.000000 | ACCEPT |
+| 11 | memoise per-kernel ligand slice | exact | 3.0 (niche-LR, separate axis) | **104.8x** (314.5 s -> 3.0 s) | 1.000000 | ACCEPT |
 
 **Net: 22.5x faster than the controlled baseline and 26.6x faster than the R
 reference on the same core count, with the headline parity metric flat at
@@ -499,7 +549,8 @@ R reference itself is the less accurate of the two (see `MATH.md` §3).
 
 ## Stop reason
 
-Playbook exhausted for this port's pattern: the remaining runtime is dominated
-by the per-gene IRLS, which is already a rank-truncated QR at the minimum
-arithmetic cost, and by the Brown/Cauchy pooling, which is O(n_gene x
-n_celltype^2) and already vectorised.
+Playbook exhausted for this port's pattern. `niche_DE`'s remaining runtime is
+dominated by the per-gene IRLS, already a rank-truncated QR at minimum
+arithmetic cost, and by the Brown/Cauchy pooling, already vectorised and
+O(n_gene x n_celltype^2). `niche_LR_*` is now dominated by the per-candidate
+Poisson GLMs, which are irreducible without changing the statistics.

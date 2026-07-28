@@ -199,7 +199,12 @@ Full breakdown, including the `Int = FALSE` branch and the helper functions, in
 | `pynichede.niche_DE`, 16 cores | **33 s** |
 
 ≈ **26x faster**, entirely from exact algebraic rewrites and scheduling — no
-approximation. See [`ITERATION_LOG.md`](ITERATION_LOG.md) and
+approximation.
+
+`niche_LR_spot` on the same fixture (579 candidate ligands against the
+16 968 x 579 NicheNet matrix) went from **314.5 s to 3.0 s (105x)** by
+memoising a per-kernel slice that the R source recomputes once per ligand —
+byte-identical output. See [`ITERATION_LOG.md`](ITERATION_LOG.md) and
 [`MATH.md`](MATH.md).
 
 ---
