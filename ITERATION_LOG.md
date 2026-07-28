@@ -490,23 +490,27 @@ admissibility_evidence: |
   `niche_LR_spot` table against the pre-optimisation run — **byte-identical**,
   including the `top_downstream_niche_DE_genes` strings — and against R's
   table (9/9 ligand-receptor pairs identical).
-wall_clock_mean_s: 3.0
-wall_clock_stddev_s: null
-wall_clock_runs_s: [3.0]
-ablation_this_change_only_s: 314.5
-speedup_vs_previous: 104.8
-speedup_vs_baseline: 104.8
+wall_clock_mean_s: 0.686
+wall_clock_stddev_s: 0.007
+wall_clock_runs_s: [0.686]
+speedup_vs_previous: 1.00
+speedup_vs_baseline: 22.5
+niche_lr_time_before_s: 314.5
+niche_lr_time_after_s: 3.0
+niche_lr_speedup: 104.8
 parity_metric: 1.000000
 parity_delta_vs_baseline: 0.0
 parity_passes: true
 notes: |
-  Measured on the canonical full fixture (579 candidate ligands against a
-  16968 x 579 NicheNet matrix): **314.5 s -> 3.0 s, 104.8x**.  This is a
-  separate wall-clock axis from iters 0-10, which time `niche_DE`; niche-LR is
-  a downstream call and was not part of that trajectory.  Surfaced only
-  because building the tutorial notebook made the minutes-long call obvious —
-  a good argument for the protocol's insistence that the notebooks be
-  genuinely executed rather than sketched.
+  SEPARATE WALL-CLOCK AXIS.  `wall_clock_mean_s` above is the `niche_DE`
+  pipeline, which this rewrite does not touch and which is therefore carried
+  forward unchanged at 0.686 s — the plotted trajectory must not show a
+  regression here.  The rewrite's effect is on the downstream `niche_LR_*`
+  call, recorded in `niche_lr_*`: on the canonical full fixture (579 candidate
+  ligands against a 16968 x 579 NicheNet matrix) **314.5 s -> 3.0 s, 104.8x**.
+  Surfaced only because executing the tutorial notebook made the minutes-long
+  call obvious — an argument for the protocol's insistence that the notebooks
+  genuinely run rather than being sketched.
 ```
 
 ### Decision
@@ -532,7 +536,7 @@ All wall-clock figures: dev fixture (848 spots x 300 genes x 7 cell types x
 | 8 | per-gene joblib tasks | exact | 14.34 +- 2.06 (n_jobs=8) | **0.048x — slower** | 1.000000 | **REJECT_SLOW** |
 | 9 | chunked dispatch, 1 BLAS thread/worker | exact | **0.686 +- 0.007** (n_jobs=8) | 2.80x vs serial, 20.9x vs iter 8 | 1.000000 | ACCEPT |
 | 10 | prefilter runnable genes | exact | 0.686 (n_jobs=8) | folded in; largest effect on the full fixture | 1.000000 | ACCEPT |
-| 11 | memoise per-kernel ligand slice | exact | 3.0 (niche-LR, separate axis) | **104.8x** (314.5 s -> 3.0 s) | 1.000000 | ACCEPT |
+| 11 | memoise per-kernel ligand slice | exact | 0.686 (`niche_DE` unchanged) | **104.8x on `niche_LR_*`** (314.5 s -> 3.0 s) | 1.000000 | ACCEPT |
 
 **Net: 22.5x faster than the controlled baseline and 26.6x faster than the R
 reference on the same core count, with the headline parity metric flat at

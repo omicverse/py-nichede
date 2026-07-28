@@ -685,6 +685,123 @@ iter_panel(10, extra=(f"prefilter removes {frac*100:.1f}% of genes on the full f
 ''')
 
 
+I(11, "Acceleration — memoise the per-kernel ligand-target slice",
+  r"""
+**What changed.** `_ligand_scores`, shared by `niche_LR_spot` and `niche_LR_cell`, now caches
+the filtered-and-reordered NicheNet ligand-target matrix in a dict keyed on the kernel index,
+instead of rebuilding it inside the per-candidate-ligand loop the way the R source does.
+
+**Why.** R runs this once per candidate ligand:
+`sig <- T_vector[[top_kernel[ind]]]`, `genes <- gene_names[!is.na(sig)]`,
+`lv <- ligand_target_matrix[rownames %in% genes, ]`, `lv <- lv[genes, ]`. Every line of it
+depends **only** on `top_kernel[ind]` — which kernel bandwidth fits that ligand best — and that
+takes at most `len(sigma)` = 3 distinct values. So across the 579 candidate ligands there are at
+most 3 distinct results and the other 576 evaluations rebuild an array that already exists. On
+the canonical fixture that is 576 redundant reindexes of a 16968 × 579 frame.
+
+**Admissibility — class (E), exact.** Memoisation of a pure function: the cached value is the
+same object the loop would have recomputed, bit for bit. Verified by diffing the produced
+`niche_LR_spot` table against both the pre-memoisation run and R's table — byte-identical,
+including the comma-joined `top_downstream_niche_DE_genes` strings.
+
+**A note on the axis.** This is the one iteration that is *not* on the `niche_DE` trajectory
+plotted above. `niche_LR_*` is a downstream call, so `ITERATION_LOG.md` carries the `niche_DE`
+pipeline time forward unchanged at 0.686 s for this block — deliberately, so the trajectory
+cannot appear to regress — and records the effect in separate `niche_lr_*` fields. The cell
+below measures both: that `niche_DE` is untouched, and that the ligand sweep is ~105× faster.
+
+**How it was found.** Not by reading the code. It surfaced because the tutorial notebook was
+*executed* rather than sketched, and a cell that should have taken seconds took five minutes.
+That is an argument for the protocol's insistence on genuinely running the deliverables.
+
+[ITER_LOG ↩](../ITERATION_LOG.md)
+""",
+  r'''
+# 1. The claim's own numbers, from the log.
+before = float(logged(11, "niche_lr_time_before_s"))
+after_logged = float(logged(11, "niche_lr_time_after_s"))
+print(f"ITERATION_LOG.md: niche_LR_spot {before:.1f} s -> {after_logged:.1f} s "
+      f"({before / after_logged:.1f}x), niche_DE unchanged at "
+      f"{float(logged(11, 'wall_clock_mean_s')):.3f} s")
+
+# 2. Re-measure the memoised call live on the canonical FULL fixture.
+from pynichede import niche_LR_spot
+
+ltm = pd.DataFrame(full["in_ligand_target_matrix"],
+                   index=list(full.meta["ltm_rownames"]),
+                   columns=list(full.meta["ltm_colnames"]))
+lr_mat = pd.DataFrame({"ligand": list(full.meta["lr_ligand"]),
+                       "receptor": list(full.meta["lr_receptor"])})
+
+# `of` was built (and its effective niche computed) back in iteration 7; niche-LR
+# additionally needs the fitted model, so run niche_DE on it once here.
+if not of.niche_DE:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        _ = nde.niche_DE(of, num_cores=N_JOBS, verbose=False)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    t0 = time.perf_counter()
+    lr_now = niche_LR_spot(of, "myeloid", "tumor_epithelial", ltm, lr_mat)
+    T_LR_NOW = time.perf_counter() - t0
+print(f"measured here, full {ltm.shape[1]}-ligand sweep: {T_LR_NOW:.2f} s "
+      f"-> {len(lr_now)} ligand-receptor pairs")
+
+# 3. Cost of the slice the memoisation removes, measured directly.
+#    Re-running the whole uncached sweep would add ~5 min to this notebook, so
+#    instead we time ONE slice and multiply by the number of evaluations the
+#    uncached loop would perform.  It has to be the slice the real call actually
+#    builds: the candidate-ligand-filtered matrix, and the T-vector for the
+#    (index = tumor_epithelial, niche = myeloid) pair -- using any other pair
+#    gives a much smaller `lv` and badly understates the cost.
+from pynichede.rstats import r_quantile as _rq
+
+_index = list(of.cell_types).index("tumor_epithelial")
+_niche = list(of.cell_types).index("myeloid")
+_Lv = np.asarray(of.ref_expr, dtype=float)
+_CT = np.array([_rq(_Lv[i], 0.25) for i in range(_Lv.shape[0])])
+_cand = set(np.asarray(of.gene_names)[_Lv[_niche] > _CT[_niche]])
+ltm_cand = ltm.loc[:, [c for c in ltm.columns if c in _cand]]   # what the loop iterates
+
+gnames = np.asarray(of.gene_names)
+ltm_idx = pd.Index(ltm_cand.index)
+sig0 = np.array([r["T_stat"][_index, _niche] if r["T_stat"] is not None else np.nan
+                 for r in of.niche_DE[0]])
+g0 = gnames[~np.isnan(sig0)]
+t0 = time.perf_counter()
+common = ltm_idx.isin(set(g0))
+lv0 = ltm_cand.loc[common]
+lv0 = lv0.loc[g0[np.isin(g0, lv0.index.to_numpy())]]
+T_SLICE = time.perf_counter() - t0
+n_lig = ltm_cand.shape[1]
+n_sig = len(of.sigma)
+print(f"\ncandidate ligands the loop iterates          : {n_lig} of {ltm.shape[1]}")
+print(f"one slice -> lv {lv0.shape}                 : {T_SLICE * 1e3:7.1f} ms")
+print(f"uncached: {n_lig} evaluations                 : {T_SLICE * n_lig:7.1f} s  (projected)")
+print(f"memoised: at most len(sigma) = {n_sig} evaluations  : {T_SLICE * n_sig:7.1f} s")
+print(f"redundant evaluations removed               : {n_lig - n_sig}")
+print(f"\nprojection {T_SLICE * n_lig:.0f} s vs the {before:.1f} s logged for the "
+      f"uncached sweep -> the slice accounts for essentially all of it")
+
+# 4. Admissibility: the output must be byte-identical to the pre-memoisation run.
+lr_ref = pd.read_csv(os.path.join(REF_DIR, "ref_niche_LR_spot.csv"))
+pairs_now = set(map(tuple, lr_now[["ligand", "receptor"]].astype(str).to_numpy()))
+pairs_R = set(map(tuple, lr_ref.iloc[:, :2].astype(str).to_numpy()))
+same_pairs = pairs_now == pairs_R
+same_str = sorted(lr_now["top_downstream_niche_DE_genes"].astype(str)) == \
+           sorted(lr_ref.iloc[:, 2].astype(str))
+print(f"\nligand-receptor pairs identical to R : {same_pairs}  ({len(pairs_R)} pairs)")
+print(f"downstream-gene strings identical    : {same_str}   <- the admissibility claim")
+
+iter_panel(11, extra=(f"full {n_lig}-ligand sweep {T_LR_NOW:.2f} s (log: {before:.1f} s -> "
+                      f"{after_logged:.1f} s, {before/after_logged:.0f}x); {n_lig - n_sig} "
+                      f"redundant slices removed; output identical to R"),
+           bars=("niche_LR_spot, full ligand sweep",
+                 ["before memoisation", "shipped"], [before, T_LR_NOW]),
+           bar_colors=[C_R, C_PY])
+''')
+
+
 def cells():
     C = []
     C.append(md(r"""
@@ -694,8 +811,8 @@ def cells():
 really iterate, or did it skip the loop and log only the survivor?"*
 
 There is exactly **one `## Iteration N — title` header per entry in
-[`ITERATION_LOG.md`](../ITERATION_LOG.md)** — 11 in total: the baseline translation, three
-equivalence fixes, six accepted accelerations, and **one rejection** (iteration 8, `REJECT_SLOW`).
+[`ITERATION_LOG.md`](../ITERATION_LOG.md)** — 12 in total: the baseline translation, three
+equivalence fixes, seven accepted accelerations, and **one rejection** (iteration 8, `REJECT_SLOW`).
 Each block carries a written narrative of what changed and why, plus a code cell that
 **re-measures** the claim live and emits that iteration's subplot. The rejection is kept, with
 its numbers, because the reason it failed is what shaped the design of iteration 9.
@@ -991,7 +1108,7 @@ print(f"no iteration ever dropped below the pre-registered gate "
     C.append(md(r"""
 ## What the iteration history shows
 
-* **11 blocks, one per `ITERATION_LOG.md` entry**, including the rejection. Iteration 8 tried
+* **12 blocks, one per `ITERATION_LOG.md` entry**, including the rejection. Iteration 8 tried
   the most obvious parallelisation — one joblib task per gene, exactly mirroring R's
   `foreach %dopar%` — and made the pipeline **20.9× slower** than the chunked dispatch that
   replaced it, and slower even than running serially. It is kept in the record because the
@@ -1013,11 +1130,17 @@ print(f"no iteration ever dropped below the pre-registered gate "
 
 * **Every accepted rewrite is class (E) or scheduling.** No bounded-epsilon approximation was
   used anywhere, so there is no perturbation budget to charge against the parity threshold, and
-  the parity metric is flat at 1.000000 across all 11 blocks.
+  the parity metric is flat at 1.000000 across all 12 blocks.
 
-* **Stop reason.** The playbook is exhausted for this port's shape: the remaining runtime is the
-  per-gene IRLS (already a rank-truncated QR at minimum arithmetic cost) and the Brown/Cauchy
-  pooling (already `O(n_gene × n_celltype^2)` and vectorised).
+* **One iteration came from running the deliverables, not reading the code.** Iteration 11 was
+  found because executing the tutorial notebook made a five-minute cell obvious; it turned out to
+  be 576 redundant rebuilds of the same array, and removing them was worth 105× with
+  byte-identical output. Notebooks that are merely sketched would not have surfaced it.
+
+* **Stop reason.** The playbook is exhausted for this port's shape: `niche_DE`'s remaining
+  runtime is the per-gene IRLS (already a rank-truncated QR at minimum arithmetic cost) and the
+  Brown/Cauchy pooling (already `O(n_gene × n_celltype^2)` and vectorised); `niche_LR_*` is now
+  dominated by the per-candidate Poisson GLMs, irreducible without changing the statistics.
 
 Related: [`ITERATION_LOG.md`](../ITERATION_LOG.md) (authoritative log),
 [`MATH.md`](../MATH.md) (the admissibility proofs referenced above),

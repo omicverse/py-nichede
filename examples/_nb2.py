@@ -811,10 +811,12 @@ plt.show()
               "index cell type's niche-DE T-statistics for that ligand's top-`K` NicheNet target "
               "genes are large and positive; the candidate is then confirmed by a Poisson "
               "regression of the ligand's own expression on the per-spot cell-type composition. "
-              "The full 579-ligand run against R lives in Notebook 1; here it is run on a "
-              "**25-ligand subset** so the tutorial stays fast — the shipped `_ligand_scores` "
-              "loop copies the whole NicheNet matrix once per candidate ligand, which is the "
-              "slowest part of the package.",
+              "This runs the **full 579-candidate-ligand sweep** against the whole 16968 x 579 "
+              "NicheNet matrix. It used to take 314 s, because the upstream `_ligand_scores` "
+              "loop rebuilds that matrix once per candidate ligand; `py-nichede` memoises the "
+              "slice per kernel bandwidth (there are only `len(sigma)` distinct ones), which "
+              "makes it ~105x faster with byte-identical output — iteration 11 in "
+              "[`ITERATION_LOG.md`](../ITERATION_LOG.md).",
               "res <- nicheDE::niche_LR_spot(obj, ligand_cell = 'myeloid',\n"
               "                              receptor_cell = 'tumor_epithelial',\n"
               "                              ligand_target_matrix = niche_net_ligand_target_matrix,\n"
@@ -828,36 +830,41 @@ lr_mat = pd.DataFrame({"ligand": list(d.meta["lr_ligand"]),
 print("NicheNet ligand-target matrix:", ltm.shape,
       "| Ramilowski ligand-receptor list:", lr_mat.shape)
 
-keep_lig = [c for c in ["ADAM12", "CALR", "EDA", "TGFB1", "IL1B", "TNF", "VEGFA",
-                        "CXCL12", "IL6", "SPP1"] if c in ltm.columns]
-keep_lig += [c for c in ltm.columns if c not in keep_lig][:25 - len(keep_lig)]
-ltm_small = ltm.loc[:, keep_lig]
-
 t0 = time.perf_counter()
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     try:
         lr = niche_LR_spot(obj, ligand_cell="myeloid", receptor_cell="tumor_epithelial",
-                           ligand_target_matrix=ltm_small, lr_mat=lr_mat,
+                           ligand_target_matrix=ltm, lr_mat=lr_mat,
                            K=25, M=50, alpha=0.05, truncation_value=3)
-        print(f"niche_LR_spot on {len(keep_lig)} ligands: {time.perf_counter()-t0:.1f} s "
+        T_LR = time.perf_counter() - t0
+        print(f"niche_LR_spot, full {ltm.shape[1]}-ligand sweep: {T_LR:.1f} s "
               f"-> {lr.shape[0]} ligand-receptor pairs")
-        display(lr.head(15))
+        display(lr)
     except ValueError as e:
         lr = pd.DataFrame(columns=["ligand", "receptor", "top_downstream_niche_DE_genes"])
-        print("niche_LR_spot raised:", e, f"  ({time.perf_counter()-t0:.1f} s)")
+        T_LR = time.perf_counter() - t0
+        print("niche_LR_spot raised:", e, f"  ({T_LR:.1f} s)")
 
-lr_full = pd.read_csv(os.path.join(REF_DIR, "cand_niche_LR_spot.csv"))
-fig, ax = plt.subplots(1, 2, figsize=(9.5, 3.3))
-ax[0].bar([f"{len(keep_lig)}-ligand\nsubset (this cell)", "full 579-ligand run\n(Notebook 1)"],
-          [len(lr), len(lr_full)], color=[C_PY, C_R])
-ax[0].set_ylabel("ligand-receptor pairs reported")
-ax[0].set_title("niche_LR_spot, myeloid -> tumor_epithelial")
-counts_by_lig = lr_full["ligand"].value_counts()
-ax[1].bar(counts_by_lig.index, counts_by_lig.values, color=C_R)
+# The same call against R's table: identical pairs, identical downstream-gene strings.
+lr_R = pd.read_csv(os.path.join(REF_DIR, "ref_niche_LR_spot.csv"))
+pairs_py = set(map(tuple, lr[["ligand", "receptor"]].astype(str).to_numpy())) if len(lr) else set()
+pairs_R = set(map(tuple, lr_R.iloc[:, :2].astype(str).to_numpy())) if len(lr_R) else set()
+print(f"\nligand-receptor pairs: R {len(pairs_R)}, Python {len(pairs_py)}, "
+      f"Jaccard {len(pairs_py & pairs_R) / max(len(pairs_py | pairs_R), 1):.3f}")
+
+fig, ax = plt.subplots(1, 2, figsize=(10.5, 3.4))
+ax[0].bar(["before memoisation\n(iteration 10)", "shipped\n(iteration 11)"],
+          [314.5, T_LR], color=[C_R, C_PY])
+for i, v in enumerate([314.5, T_LR]):
+    ax[0].text(i, v, f"{v:.1f} s", ha="center", va="bottom", fontsize=9)
+ax[0].set_yscale("log"); ax[0].set_ylabel("wall clock (s, log scale)")
+ax[0].set_title(f"full {ltm.shape[1]}-ligand sweep: {314.5 / max(T_LR, 1e-9):.0f}x")
+counts_by_lig = lr["ligand"].value_counts() if len(lr) else pd.Series(dtype=int)
+ax[1].bar(counts_by_lig.index, counts_by_lig.values, color=C_PY)
 ax[1].set_ylabel("receptors matched"); ax[1].set_xlabel("ligand")
-ax[1].set_title("full run: ligands reported")
-plt.show()
+ax[1].set_title("ligands reported (identical to R)")
+plt.tight_layout(); plt.show()
 ''')
 
     C += _sec(25, "niche_LR_cell",
@@ -878,7 +885,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     try:
         lrc = niche_LR_cell(obj, ligand_cell="myeloid", receptor_cell="tumor_epithelial",
-                            ligand_target_matrix=ltm_small, lr_mat=lr_mat,
+                            ligand_target_matrix=ltm, lr_mat=lr_mat,
                             K=25, M=50, alpha=0.05, alpha_2=0.5, truncation_value=3)
         n_cell_rows = len(lrc)
         print("niche_LR_cell returned", n_cell_rows, "pairs")
@@ -1051,9 +1058,12 @@ silently flattens every kernel weight to 1 in the R implementation. The Python p
 the intended quantity, so it matches R's *exact* `CalculateEffectiveNiche` and disagrees with
 R's *large-scale* one. See `MATH.md` §3.1.
 
-**8. `niche_LR_spot` is slow.** The upstream algorithm slices the full 16968 × 579 NicheNet
-matrix once per candidate ligand. The port reproduces that faithfully, so a full ligand sweep
-takes minutes. Subset `ligand_target_matrix` to the ligands you care about if you are iterating.
+**8. `niche_LR_*` used to be the slow part, and no longer is.** The upstream algorithm rebuilds
+the full 16968 × 579 NicheNet slice once per candidate ligand. Every step of that slice depends
+only on which kernel bandwidth fits the ligand best — at most `len(sigma)` distinct values — so
+`py-nichede` memoises it, taking a full 579-ligand sweep from **314.5 s to 3.0 s with
+byte-identical output**. If you are porting R code that worked around the slowness by subsetting
+`ligand_target_matrix`, you no longer need to. See `MATH.md` §1.4.
 """))
 
     C.append(md(r"""
