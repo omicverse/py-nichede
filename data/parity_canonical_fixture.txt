@@ -1,0 +1,70 @@
+
+output                                 kind                                         metric       thr
+--------------------------------------------------------------------------------------------------------
+T_to_p(two.sided)                      det                         max|err|=1.110e-16 n=49      None
+T_to_p(positive)                       det                         max|err|=1.110e-16 n=49      None
+T_to_p(negative)                       det                         max|err|=1.110e-16 n=49      None
+ultosymmetric                          det                         max|err|=0.000e+00 n=49      None
+gene_level                             det                          max|err|=0.000e+00 n=1      None
+celltype_level                         det                         max|err|=2.220e-16 n=10      None
+nb_lik                                 det                          max|err|=1.776e-15 n=1      None
+mvnconv(m2lp,side=1)                   det                         max|err|=3.000e-04 n=36      None
+mvnconv(m2lp,side=2)                   det                         max|err|=4.000e-04 n=36      None
+fisher(generalized)                    det                          max|err|=8.930e-07 n=1      None
+CreateLibraryMatrix                    det                      max|err|=0.000e+00 n=86832     1e-08
+num_cells                              det                       max|err|=4.741e-14 n=5936     1e-08
+coord (scaled)                         det                       max|err|=0.000e+00 n=1696     1e-08
+ref_expr                               det                     max|err|=0.000e+00 n=151956     1e-08
+effective_niche[1]                     det                       max|err|=2.949e-13 n=5936     1e-08
+effective_niche_largescale[1]          det                       max|err|=2.949e-13 n=5936     1e-08
+effective_niche_largescale_shippedR[1] det                       max|err|=1.639e+01 n=5936      None
+effective_niche[2]                     det                       max|err|=1.705e-13 n=5936     1e-08
+effective_niche_largescale[2]          det                       max|err|=1.705e-13 n=5936     1e-08
+effective_niche_largescale_shippedR[2] det                       max|err|=1.215e+01 n=5936      None
+effective_niche[3]                     det                       max|err|=9.370e-14 n=5936     1e-08
+effective_niche_largescale[3]          det                       max|err|=9.059e-14 n=5936     1e-08
+effective_niche_largescale_shippedR[3] det                       max|err|=5.534e+00 n=5936      None
+MergeObjects.coord                     det                       max|err|=0.000e+00 n=3392     1e-08
+MergeObjects.num_cells                 det                      max|err|=4.741e-14 n=11872     1e-08
+MergeObjects.batch_ID                  det                       max|err|=0.000e+00 n=1696     1e-08
+Filter_NDE.num_cells                   det                       max|err|=4.741e-14 n=1981     1e-08
+Filter_NDE.effective_niche             det                       max|err|=1.679e-13 n=1981     1e-08
+valid flag[1]                          agree             agreement=1.000000 R=4768 py=4768       1.0
+n_nulls[1]                             det                      max|err|=0.000e+00 n=21708     1e-08
+valid flag[2]                          agree             agreement=1.000000 R=4788 py=4788       1.0
+n_nulls[2]                             det                      max|err|=0.000e+00 n=21708     1e-08
+valid flag[3]                          agree             agreement=1.000000 R=4858 py=4858       1.0
+n_nulls[3]                             det                      max|err|=0.000e+00 n=21708     1e-08
+nulls (first 200 genes)                det                       max|err|=0.000e+00 n=9185     1e-08
+Varcov (first 50 valid genes)          det                       max|err|=8.280e-03 n=8755      None
+T_stat[1]                              corr     pearson=1.000000 spearman=1.000000 n=55015      0.99
+betas[1]                               corr     pearson=1.000000 spearman=1.000000 n=55015      0.99
+log_likelihood[1]                      corr      pearson=1.000000 spearman=1.000000 n=4862      0.99
+T_stat[2]                              corr     pearson=1.000000 spearman=1.000000 n=61369      0.99
+betas[2]                               corr     pearson=1.000000 spearman=1.000000 n=61369      0.99
+log_likelihood[2]                      corr      pearson=1.000000 spearman=1.000000 n=4857      0.99
+T_stat[3]                              corr     pearson=1.000000 spearman=1.000000 n=68159      0.99
+betas[3]                               corr     pearson=1.000000 spearman=1.000000 n=68159      0.99
+log_likelihood[3]                      corr      pearson=1.000000 spearman=1.000000 n=4871      0.99
+Int=FALSE T_stat[1]                    corr      pearson=1.000000 spearman=1.000000 n=1219      0.99
+Int=FALSE valid flag[1]                agree                 agreement=1.000000 R=93 py=93       1.0
+Int=FALSE pval_pos_gene_level          inf         spearman(-log10p)=0.988981 top50J=0.923       0.9
+pval_pos_gene_level                    inf         spearman(-log10p)=0.996551 top50J=1.000       0.9
+pval_pos_cell_type_level               inf         spearman(-log10p)=0.995994 top50J=0.923       0.9
+pval_pos_interaction_level             inf         spearman(-log10p)=1.000000 top50J=1.000       0.9
+pval_neg_gene_level                    inf         spearman(-log10p)=0.995985 top50J=1.000       0.9
+pval_neg_cell_type_level               inf         spearman(-log10p)=0.995187 top50J=0.961       0.9
+pval_neg_interaction_level             inf         spearman(-log10p)=1.000000 top50J=1.000       0.9
+praw_pos_gene_level                    inf         spearman(-log10p)=0.996551 top50J=1.000       0.9
+praw_pos_cell_type_level               inf         spearman(-log10p)=0.998273 top50J=0.923       0.9
+praw_pos_interaction_level             inf         spearman(-log10p)=1.000000 top50J=1.000       0.9
+contrast_post                          inf         spearman(-log10p)=1.000000 top50J=1.000       0.9
+check_colloc                           det                          max|err|=0.000e+00 n=3     1e-08
+genes_G_pos                            set                      jaccard=0.970 R=708 py=687       0.7
+genes_G_neg                            set                      jaccard=0.948 R=477 py=452       0.7
+genes_CT_pos                           set                      jaccard=0.964 R=239 py=246       0.7
+genes_CT_neg                           set                      jaccard=0.962 R=157 py=155       0.7
+genes_I_pos                            set                        jaccard=0.938 R=61 py=65       0.7
+genes_I_neg                            set                        jaccard=0.972 R=36 py=35       0.7
+markers                                set                        jaccard=1.000 R=55 py=55       0.7
+niche_LR_spot                          set                          jaccard=1.000 R=9 py=9       0.7

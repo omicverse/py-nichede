@@ -1,0 +1,513 @@
+{
+  "T_to_p(two.sided)": {
+    "kind": "det",
+    "max_abs_err": 1.1102230246251565e-16,
+    "n": 49,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "T_to_p(positive)": {
+    "kind": "det",
+    "max_abs_err": 1.1102230246251565e-16,
+    "n": 49,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "T_to_p(negative)": {
+    "kind": "det",
+    "max_abs_err": 1.1102230246251565e-16,
+    "n": 49,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "ultosymmetric": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 49,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "gene_level": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 1,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "celltype_level": {
+    "kind": "det",
+    "max_abs_err": 2.220446049250313e-16,
+    "n": 10,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "nb_lik": {
+    "kind": "det",
+    "max_abs_err": 1.7763568394002505e-15,
+    "n": 1,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "mvnconv(m2lp,side=1)": {
+    "kind": "det",
+    "max_abs_err": 0.000300000000000189,
+    "n": 36,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "mvnconv(m2lp,side=2)": {
+    "kind": "det",
+    "max_abs_err": 0.00039999999999995595,
+    "n": 36,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "fisher(generalized)": {
+    "kind": "det",
+    "max_abs_err": 8.929796689997362e-07,
+    "n": 1,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "CreateLibraryMatrix": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 86832,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "num_cells": {
+    "kind": "det",
+    "max_abs_err": 4.7406523151494184e-14,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "coord (scaled)": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 1696,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "ref_expr": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 151956,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche[1]": {
+    "kind": "det",
+    "max_abs_err": 2.948752353404416e-13,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale[1]": {
+    "kind": "det",
+    "max_abs_err": 2.948752353404416e-13,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale_shippedR[1]": {
+    "kind": "det",
+    "max_abs_err": 16.391275137347268,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "effective_niche[2]": {
+    "kind": "det",
+    "max_abs_err": 1.7053025658242404e-13,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale[2]": {
+    "kind": "det",
+    "max_abs_err": 1.7053025658242404e-13,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale_shippedR[2]": {
+    "kind": "det",
+    "max_abs_err": 12.147652825150752,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "effective_niche[3]": {
+    "kind": "det",
+    "max_abs_err": 9.370282327836321e-14,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale[3]": {
+    "kind": "det",
+    "max_abs_err": 9.059419880941277e-14,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "effective_niche_largescale_shippedR[3]": {
+    "kind": "det",
+    "max_abs_err": 5.534495435152423,
+    "n": 5936,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "MergeObjects.coord": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 3392,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "MergeObjects.num_cells": {
+    "kind": "det",
+    "max_abs_err": 4.7406523151494184e-14,
+    "n": 11872,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "MergeObjects.batch_ID": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 1696,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "Filter_NDE.num_cells": {
+    "kind": "det",
+    "max_abs_err": 4.7406523151494184e-14,
+    "n": 1981,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "Filter_NDE.effective_niche": {
+    "kind": "det",
+    "max_abs_err": 1.6786572132332367e-13,
+    "n": 1981,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "valid flag[1]": {
+    "kind": "agree",
+    "agreement": 1.0,
+    "n_ref": 4768,
+    "n_cand": 4768,
+    "threshold": 1.0
+  },
+  "n_nulls[1]": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 21708,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "valid flag[2]": {
+    "kind": "agree",
+    "agreement": 1.0,
+    "n_ref": 4788,
+    "n_cand": 4788,
+    "threshold": 1.0
+  },
+  "n_nulls[2]": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 21708,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "valid flag[3]": {
+    "kind": "agree",
+    "agreement": 1.0,
+    "n_ref": 4858,
+    "n_cand": 4858,
+    "threshold": 1.0
+  },
+  "n_nulls[3]": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 21708,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "nulls (first 200 genes)": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 9185,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "Varcov (first 50 valid genes)": {
+    "kind": "det",
+    "max_abs_err": 0.008280454996565823,
+    "n": 8755,
+    "nan_agree": 1.0,
+    "threshold": null
+  },
+  "T_stat[1]": {
+    "kind": "corr",
+    "pearson": 0.9999999999999993,
+    "spearman": 0.9999999999994956,
+    "n": 55015,
+    "max_abs_err": 1.4801507619566223e-06,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "betas[1]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "n": 55015,
+    "max_abs_err": 1.0593436741146434e-06,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "log_likelihood[1]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "n": 4862,
+    "max_abs_err": 4.675906666307128e-07,
+    "defined_agree": 0.9995854063018242,
+    "threshold": 0.99
+  },
+  "T_stat[2]": {
+    "kind": "corr",
+    "pearson": 0.9999999999999996,
+    "spearman": 0.9999999999997402,
+    "n": 61369,
+    "max_abs_err": 1.5084737521320335e-06,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "betas[2]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "n": 61369,
+    "max_abs_err": 2.1325377019820735e-08,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "log_likelihood[2]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 1.0,
+    "n": 4857,
+    "max_abs_err": 2.381966623943299e-09,
+    "defined_agree": 0.9995854063018242,
+    "threshold": 0.99
+  },
+  "T_stat[3]": {
+    "kind": "corr",
+    "pearson": 0.9999999999999996,
+    "spearman": 0.9999999999997347,
+    "n": 68159,
+    "max_abs_err": 1.239985155443435e-06,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "betas[3]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 0.9999999999999998,
+    "n": 68159,
+    "max_abs_err": 9.202567525790073e-06,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "log_likelihood[3]": {
+    "kind": "corr",
+    "pearson": 0.9999999999999999,
+    "spearman": 1.0,
+    "n": 4871,
+    "max_abs_err": 6.161826604511589e-11,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "Int=FALSE T_stat[1]": {
+    "kind": "corr",
+    "pearson": 1.0,
+    "spearman": 0.9999999999999999,
+    "n": 1219,
+    "max_abs_err": 4.217892701774417e-11,
+    "defined_agree": 1.0,
+    "threshold": 0.99
+  },
+  "Int=FALSE valid flag[1]": {
+    "kind": "agree",
+    "agreement": 1.0,
+    "n_ref": 93,
+    "n_cand": 93,
+    "threshold": 1.0
+  },
+  "Int=FALSE pval_pos_gene_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9889808771068987,
+    "top50_jaccard": 0.9230769230769231,
+    "pearson_neglog10p": 0.9652940501016507,
+    "n": 95,
+    "defined_agree": 1.0,
+    "threshold": 0.9
+  },
+  "pval_pos_gene_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9965508124454249,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9859628918580094,
+    "n": 4864,
+    "defined_agree": 0.999907868067072,
+    "threshold": 0.9
+  },
+  "pval_pos_cell_type_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9959936713582697,
+    "top50_jaccard": 0.9230769230769231,
+    "pearson_neglog10p": 0.9718122815218261,
+    "n": 15202,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "pval_pos_interaction_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9999999999984439,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9999998688226086,
+    "n": 65980,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "pval_neg_gene_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9959847764139502,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9937195749269698,
+    "n": 4864,
+    "defined_agree": 0.999907868067072,
+    "threshold": 0.9
+  },
+  "pval_neg_cell_type_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9951870537349818,
+    "top50_jaccard": 0.9607843137254902,
+    "pearson_neglog10p": 0.9940829829798203,
+    "n": 15202,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "pval_neg_interaction_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9999999999997284,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9999999643371121,
+    "n": 65980,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "praw_pos_gene_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9965510883213156,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9861477192545282,
+    "n": 4864,
+    "defined_agree": 0.999907868067072,
+    "threshold": 0.9
+  },
+  "praw_pos_cell_type_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9982730614499155,
+    "top50_jaccard": 0.9230769230769231,
+    "pearson_neglog10p": 0.9719024773662787,
+    "n": 15202,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "praw_pos_interaction_level": {
+    "kind": "inf",
+    "spearman_neglog10p": 0.9999999999996554,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9999998695788481,
+    "n": 65980,
+    "defined_agree": 0.999986838295296,
+    "threshold": 0.9
+  },
+  "contrast_post": {
+    "kind": "inf",
+    "spearman_neglog10p": 1.0,
+    "top50_jaccard": 1.0,
+    "pearson_neglog10p": 0.9999999999999978,
+    "n": 3423,
+    "defined_agree": 1.0,
+    "threshold": 0.9
+  },
+  "check_colloc": {
+    "kind": "det",
+    "max_abs_err": 0.0,
+    "n": 3,
+    "nan_agree": 1.0,
+    "threshold": 1e-08
+  },
+  "genes_G_pos": {
+    "kind": "set",
+    "jaccard": 0.9703389830508474,
+    "n_ref": 708,
+    "n_cand": 687,
+    "threshold": 0.7
+  },
+  "genes_G_neg": {
+    "kind": "set",
+    "jaccard": 0.9475890985324947,
+    "n_ref": 477,
+    "n_cand": 452,
+    "threshold": 0.7
+  },
+  "genes_CT_pos": {
+    "kind": "set",
+    "jaccard": 0.9635627530364372,
+    "n_ref": 239,
+    "n_cand": 246,
+    "threshold": 0.7
+  },
+  "genes_CT_neg": {
+    "kind": "set",
+    "jaccard": 0.9622641509433962,
+    "n_ref": 157,
+    "n_cand": 155,
+    "threshold": 0.7
+  },
+  "genes_I_pos": {
+    "kind": "set",
+    "jaccard": 0.9384615384615385,
+    "n_ref": 61,
+    "n_cand": 65,
+    "threshold": 0.7
+  },
+  "genes_I_neg": {
+    "kind": "set",
+    "jaccard": 0.9722222222222222,
+    "n_ref": 36,
+    "n_cand": 35,
+    "threshold": 0.7
+  },
+  "markers": {
+    "kind": "set",
+    "jaccard": 1.0,
+    "n_ref": 55,
+    "n_cand": 55,
+    "threshold": 0.7
+  },
+  "niche_LR_spot": {
+    "kind": "set",
+    "jaccard": 1.0,
+    "n_ref": 9,
+    "n_cand": 9,
+    "threshold": 0.7
+  }
+}
